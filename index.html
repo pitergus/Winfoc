@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Guía de Respiración Wim Hof</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #2c3e50;
+        }
+        #status, #instruction, #counterDisplay, #roundDisplay {
+            font-size: 1.5em;
+            margin: 15px 0;
+        }
+        #instruction {
+            font-size: 1.2em;
+            color: #555;
+            min-height: 2em; /* Para evitar saltos de diseño */
+        }
+        #counterDisplay {
+            font-weight: bold;
+            color: #3498db;
+            font-size: 2em;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        #inhaleButton {
+            background-color: #2ecc71;
+        }
+        #inhaleButton:hover {
+            background-color: #27ae60;
+        }
+        .hidden {
+            display: none;
+        }
+        .config-panel {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .config-panel label {
+            margin-right: 10px;
+        }
+        .config-panel input[type="number"] {
+            width: 60px;
+            padding: 5px;
+            margin-right: 20px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Respiración Wim Hof</h1>
+
+        <div class="config-panel">
+            <label for="numRounds">Número de Rondas:</label>
+            <input type="number" id="numRoundsInput" value="3" min="1">
+            <label for="numBreaths">Respiraciones por Ronda:</label>
+            <input type="number" id="numBreathsInput" value="30" min="10">
+            <label for="breathCycleSeconds">Duración Ciclo Respiración (seg):</label>
+            <input type="number" id="breathCycleSecondsInput" value="2.5" min="1" step="0.1">
+             <label for="recoveryHoldSeconds">Retención Recuperación (seg):</label>
+            <input type="number" id="recoveryHoldSecondsInput" value="15" min="5">
+        </div>
+
+        <div id="status">Presiona "Iniciar" para comenzar.</div>
+        <div id="roundDisplay"></div>
+        <div id="instruction"></div>
+        <div id="counterDisplay"></div>
+
+        <button id="startButton">Iniciar Ejercicio</button>
+        <button id="inhaleButton" class="hidden">He Inhalado (Iniciar Recuperación)</button>
+    </div>
+
+    <audio id="audio_get_ready" src="get_ready.mp3" preload="auto"></audio>
+    <audio id="audio_power_breath_in" src="power_breath_in.mp3" preload="auto"></audio>
+    <audio id="audio_power_breath_out" src="power_breath_out.mp3" preload="auto"></audio>
+    <audio id="audio_start_retention" src="start_retention.mp3" preload="auto"></audio>
+    <audio id="audio_start_recovery_inhale" src="start_recovery_inhale.mp3" preload="auto"></audio>
+    <audio id="audio_end_recovery_hold" src="end_recovery_hold.mp3" preload="auto"></audio>
+    <audio id="audio_round_complete" src="round_complete.mp3" preload="auto"></audio>
+    <audio id="audio_session_complete" src="session_complete.mp3" preload="auto"></audio>
+
+    <script>
+        // --- Configuración ---
+        let TOTAL_ROUNDS = parseInt(document.getElementById('numRoundsInput').value);
+        let NUM_POWER_BREATHS = parseInt(document.getElementById('numBreathsInput').value);
+        let BREATH_CYCLE_DURATION_MS = parseFloat(document.getElementById('breathCycleSecondsInput').value) * 1000; // Duración de un ciclo completo (Inhalar + Exhalar)
+        let RECOVERY_HOLD_SECONDS = parseInt(document.getElementById('recoveryHoldSecondsInput').value);
+
+        // --- Elementos del DOM ---
+        const statusDisplay = document.getElementById('status');
+        const instructionDisplay = document.getElementById('instruction');
+        const counterDisplay = document.getElementById('counterDisplay');
+        const roundDisplay = document.getElementById('roundDisplay');
+        const startButton = document.getElementById('startButton');
+        const inhaleButton = document.getElementById('inhaleButton');
+        const numRoundsInput = document.getElementById('numRoundsInput');
+        const numBreathsInput = document.getElementById('numBreathsInput');
+        const breathCycleSecondsInput = document.getElementById('breathCycleSecondsInput');
+        const recoveryHoldSecondsInput = document.getElementById('recoveryHoldSecondsInput');
+
+        // --- Elementos de Audio (asegúrate que los IDs coincidan con tus tags <audio>) ---
+        const sounds = {
+            getReady: document.getElementById('audio_get_ready'),
+            powerBreathIn: document.getElementById('audio_power_breath_in'),
+            powerBreathOut: document.getElementById('audio_power_breath_out'),
+            startRetention: document.getElementById('audio_start_retention'),
+            startRecoveryInhale: document.getElementById('audio_start_recovery_inhale'),
+            endRecoveryHold: document.getElementById('audio_end_recovery_hold'),
+            roundComplete: document.getElementById('audio_round_complete'),
+            sessionComplete: document.getElementById('audio_session_complete')
+        };
+
+        // --- Estado de la Aplicación ---
+        let currentRound = 0;
+        let breathCount = 0;
+        let timerInterval;
+        let stopwatchSeconds = 0;
+        let isPaused = false; // A implementar en futuras mejoras
+        let exerciseInProgress = false;
+
+        // --- Funciones de Audio ---
+        function playSound(soundElement) {
+            if (soundElement && soundElement.readyState >= 2) { // HAVE_CURRENT_DATA or more
+                soundElement.currentTime = 0; // Reiniciar por si se llama rápidamente
+                soundElement.play().catch(error => console.error("Error al reproducir sonido:", error));
+            } else {
+                console.warn("Sonido no listo o no encontrado:", soundElement);
+            }
+        }
+
+        // --- Lógica del Ejercicio ---
+
+        startButton.addEventListener('click', () => {
+            if (!exerciseInProgress) {
+                // Leer configuración al iniciar
+                TOTAL_ROUNDS = parseInt(numRoundsInput.value);
+                NUM_POWER_BREATHS = parseInt(numBreathsInput.value);
+                BREATH_CYCLE_DURATION_MS = parseFloat(breathCycleSecondsInput.value) * 1000;
+                RECOVERY_HOLD_SECONDS = parseInt(recoveryHoldSecondsInput.value);
+
+                // Deshabilitar inputs de configuración
+                numRoundsInput.disabled = true;
+                numBreathsInput.disabled = true;
+                breathCycleSecondsInput.disabled = true;
+                recoveryHoldSecondsInput.disabled = true;
+
+                exerciseInProgress = true;
+                startButton.textContent = "Ejercicio en Progreso...";
+                startButton.disabled = true;
+                startSession();
+            }
+        });
+
+        inhaleButton.addEventListener('click', () => {
+            clearInterval(timerInterval); // Detener cronómetro de retención
+            playSound(sounds.startRecoveryInhale);
+            inhaleButton.classList.add('hidden');
+            recoveryPhase();
+        });
+
+        function updateDisplays(status, instructionText = "", counterText = "") {
+            statusDisplay.textContent = status;
+            instructionDisplay.textContent = instructionText;
+            counterDisplay.textContent = counterText;
+        }
+
+        async function startSession() {
+            currentRound = 0;
+            updateDisplays("¡Prepárate!", "La sesión comenzará en breve...");
+            playSound(sounds.getReady);
+            await delay(3000); // Espera 3 segundos antes de la primera ronda
+            nextRound();
+        }
+
+        function nextRound() {
+            currentRound++;
+            if (currentRound > TOTAL_ROUNDS) {
+                endSession();
+                return;
+            }
+            roundDisplay.textContent = `Ronda ${currentRound} de ${TOTAL_ROUNDS}`;
+            if (currentRound > 1) playSound(sounds.roundComplete); // Sonido entre rondas
+            powerBreathsPhase();
+        }
+
+        async function powerBreathsPhase() {
+            updateDisplays(`Ronda ${currentRound}: Respiraciones Potentes`, `Respira Profundamente...`);
+            breathCount = 0;
+
+            for (let i = 1; i <= NUM_POWER_BREATHS; i++) {
+                if (!exerciseInProgress) return; // Salir si se detuvo
+                breathCount = i;
+                updateDisplays(`Ronda ${currentRound}: Respiraciones Potentes`, "INHALA profundamente por la nariz o boca...", `${breathCount}/${NUM_POWER_BREATHS}`);
+                playSound(sounds.powerBreathIn);
+                await delay(BREATH_CYCLE_DURATION_MS / 2);
+
+                if (!exerciseInProgress) return;
+                 updateDisplays(`Ronda ${currentRound}: Respiraciones Potentes`, "EXHALA completamente, sin forzar...", `${breathCount}/${NUM_POWER_BREATHS}`);
+                playSound(sounds.powerBreathOut);
+                await delay(BREATH_CYCLE_DURATION_MS / 2);
+            }
+            
+            playSound(sounds.startRetention);
+            updateDisplays(`Ronda ${currentRound}: Retención`, "EXHALA completamente y SOSTÉN la respiración.", "Inicia el cronómetro...");
+            await delay(1500); // Pequeña pausa antes de iniciar el cronómetro
+            retentionPhase();
+        }
+
+        function retentionPhase() {
+            updateDisplays(`Ronda ${currentRound}: Retención`, "Sostén la respiración el mayor tiempo posible (sin aire).", "0s");
+            inhaleButton.classList.remove('hidden');
+            stopwatchSeconds = 0;
+            counterDisplay.textContent = `${stopwatchSeconds}s`;
+            timerInterval = setInterval(() => {
+                stopwatchSeconds++;
+                counterDisplay.textContent = `${stopwatchSeconds}s`;
+            }, 1000);
+        }
+
+        async function recoveryPhase() {
+            updateDisplays(`Ronda ${currentRound}: Recuperación`, `INHALA profundamente y SOSTÉN por ${RECOVERY_HOLD_SECONDS} segundos.`);
+            // El sonido startRecoveryInhale ya se tocó al hacer clic en el botón
+
+            let recoveryTimer = RECOVERY_HOLD_SECONDS;
+            counterDisplay.textContent = `${recoveryTimer}s`;
+
+            timerInterval = setInterval(async () => {
+                recoveryTimer--;
+                counterDisplay.textContent = `${recoveryTimer}s`;
+                if (recoveryTimer <= 0) {
+                    clearInterval(timerInterval);
+                    playSound(sounds.endRecoveryHold);
+                    updateDisplays(`Ronda ${currentRound}: Recuperación Completa`, "Suelta la respiración.", "¡Bien hecho!");
+                    await delay(2000); // Pausa antes de la siguiente ronda
+                    nextRound();
+                }
+            }, 1000);
+        }
+
+        function endSession() {
+            updateDisplays("¡Ejercicio Completado!", "Has finalizado todas las rondas.", "🎉");
+            roundDisplay.textContent = "";
+            playSound(sounds.sessionComplete);
+            exerciseInProgress = false;
+            startButton.textContent = "Iniciar Ejercicio";
+            startButton.disabled = false;
+            // Habilitar inputs de configuración
+            numRoundsInput.disabled = false;
+            numBreathsInput.disabled = false;
+            breathCycleSecondsInput.disabled = false;
+            recoveryHoldSecondsInput.disabled = false;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Inicializar la interfaz
+        updateDisplays("Presiona 'Iniciar' para comenzar.");
+        roundDisplay.textContent = "";
+        counterDisplay.textContent = "";
+
+    </script>
+
+</body>
+</html>
